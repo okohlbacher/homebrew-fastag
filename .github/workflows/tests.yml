@@ -1,0 +1,83 @@
+name: tests
+
+# Audit, style, the macOS floor check and a real install of both casks.
+# This is what protects a hand-made edit; commits made by update-casks.yml
+# were already put through exactly these checks before they were pushed (and
+# a GITHUB_TOKEN push does not trigger this workflow anyway).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+env:
+  TAP: okohlbacher/fastag
+  HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+  HOMEBREW_NO_ENV_HINTS: 1
+
+jobs:
+  test:
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Register the checkout as the tap
+        run: |
+          taps="$(brew --repository)/Library/Taps/okohlbacher"
+          mkdir -p "$taps"
+          ln -s "$GITHUB_WORKSPACE" "$taps/homebrew-fastag"
+          brew trust "$TAP"
+          brew tap-info "$TAP"
+          brew --version
+
+      - name: Audit, style, and the declared macOS floors
+        run: |
+          # --except=min_os: see update-casks.yml -- the app bundle claims
+          # macOS 11 but the binaries inside need 14/15, the casks follow the
+          # binaries, and check-macos-floor.sh verifies that for both
+          # architectures.
+          brew audit --cask --strict --online --except=min_os "$TAP/fastag" "$TAP/fastag-cli"
+          brew style "$TAP"
+          brew fetch --cask --arch all "$TAP/fastag" "$TAP/fastag-cli"
+          .github/scripts/check-macos-floor.sh "$TAP" fastag fastag-cli
+
+      - name: Install the command-line tool and run it
+        run: |
+          version=$(brew info --cask --json=v2 "$TAP/fastag-cli" | jq -r '.casks[0].version')
+          brew install --cask "$TAP/fastag-cli"
+          command -v FASTag
+          FASTag --help 2>&1 | tee "$RUNNER_TEMP/help.txt" | head -20
+          grep -F "Version: $version" "$RUNNER_TEMP/help.txt"
+          mz="$(brew --caskroom)/fastag-cli/$version/FASTag/share-OpenMS/examples/ID/Ecoli_MS2_small.mzML"
+          test -s "$mz"
+          cd "$RUNNER_TEMP"
+          FASTag -in "$mz" -out smoke.tsv -species -species_out smoke.species.tsv \
+            -tag_length 7 -extension 2 -fragment_tolerance 0.3 -fragment_tolerance_unit Da
+          [ "$(wc -l < smoke.species.tsv)" -ge 2 ] || { echo "::error::species smoke wrote an empty report"; exit 1; }
+          head -3 smoke.species.tsv
+
+      - name: Install the desktop app and check Gatekeeper accepts it
+        run: |
+          version=$(brew info --cask --json=v2 "$TAP/fastag" | jq -r '.casks[0].version')
+          brew install --cask "$TAP/fastag"
+          spctl -a -vv /Applications/FASTag.app 2>&1 | tee "$RUNNER_TEMP/spctl.txt"
+          grep -q "accepted" "$RUNNER_TEMP/spctl.txt"
+          [ "$(defaults read /Applications/FASTag.app/Contents/Info.plist CFBundleShortVersionString)" = "$version" ]
+          /Applications/FASTag.app/Contents/Resources/resources/fastag/bin/FASTag --help 2>&1 | grep -F "Version: $version"
+
+      - name: Uninstall both
+        run: |
+          brew uninstall --cask "$TAP/fastag" "$TAP/fastag-cli"
+          if command -v FASTag; then echo "::error::FASTag still on PATH after uninstall"; exit 1; fi
+          test ! -e /Applications/FASTag.app

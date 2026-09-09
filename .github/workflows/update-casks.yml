@@ -1,0 +1,246 @@
+name: update casks
+
+# Publishes a FASTag release to this tap: rewrites version + both sha256s of
+# each cask from the release's disk images, audits, installs, commits.
+#
+# Two triggers, one implementation:
+#   schedule          -- no secrets needed; the latest release is read from the
+#                        public API. Up to 6 h of latency (GitHub may delay or
+#                        drop scheduled runs, and disables the schedule after
+#                        60 days without a commit here -- see the README).
+#   workflow_dispatch -- fired by FASTag's own CI (job `homebrew-tap`, which
+#                        needs the optional HOMEBREW_TAP_TOKEN secret over
+#                        there), or by hand, with a specific tag.
+#
+# A push made with GITHUB_TOKEN does not trigger tests.yml (GitHub's
+# recursion guard), so every check tests.yml would run is run HERE, before
+# the commit exists.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'FASTag release tag to publish (vX.Y.Z); empty = latest release'
+        type: string
+        required: false
+        default: ''
+  schedule:
+    # Off the hour and off the half-hour: GitHub delays or drops jobs
+    # scheduled at peak minutes.
+    - cron: '23 */6 * * *'
+
+permissions: {}
+
+# Serialise, never cancel: a run in its install test must not be killed, and
+# two runs must not race each other's push. GitHub keeps ONE pending run per
+# group and replaces it when a third arrives; that is fine here because every
+# run re-resolves the release it should publish (a later dispatch is for a
+# newer tag, a schedule run reads "latest").
+concurrency:
+  group: update-casks
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+env:
+  UPSTREAM: okohlbacher/FASTag
+  TAP: okohlbacher/fastag
+  ASSETS: FASTag-gui-macos-arm64.dmg FASTag-gui-macos-x64.dmg FASTag-macos-arm64.dmg FASTag-macos-x64.dmg
+  GH_TOKEN: ${{ github.token }}
+  HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+  HOMEBREW_NO_ENV_HINTS: 1
+
+jobs:
+  update:
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # Make the checkout BE the tap rather than cloning it a second time:
+      # `brew bump-cask-pr` edits the file inside the tap, and the commit at
+      # the end has to come from the same tree (with the credentials
+      # actions/checkout left behind). A symlink into Library/Taps is what
+      # Homebrew's own developers do. Trusting the tap is required since
+      # Homebrew 6 before any of its casks can be loaded.
+      - name: Register the checkout as the tap
+        run: |
+          taps="$(brew --repository)/Library/Taps/okohlbacher"
+          mkdir -p "$taps"
+          ln -s "$GITHUB_WORKSPACE" "$taps/homebrew-fastag"
+          brew trust "$TAP"
+          brew tap-info "$TAP"
+          brew --version
+          echo "base=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Resolve the release to publish
+        id: release
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ -n "$TAG_INPUT" ]; then
+            [[ "$TAG_INPUT" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+              echo "::error::tag must look like vX.Y.Z, got '$TAG_INPUT'"; exit 1; }
+            release=$(gh api "repos/$UPSTREAM/releases/tags/$TAG_INPUT")
+          else
+            release=$(gh api "repos/$UPSTREAM/releases/latest")
+          fi
+          tag=$(jq -r .tag_name <<<"$release")
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::release tag '$tag' is not vX.Y.Z"; exit 1; }
+          if [ "$(jq -r .draft <<<"$release")" = true ] || [ "$(jq -r .prerelease <<<"$release")" = true ]; then
+            echo "::error::$tag is a draft or pre-release; not publishing it to the tap"; exit 1
+          fi
+
+          # Completeness: every image the casks reference must be attached.
+          # The release is created by whichever build leg finishes first, so
+          # for an hour or so it exists with assets missing. A scheduled run
+          # that lands in that window is a no-op and tries again next time;
+          # a dispatch asked for THIS tag and fails loudly instead.
+          have=$(jq -r '.assets[] | select(.state == "uploaded") | .name' <<<"$release")
+          missing=""
+          for a in $ASSETS; do
+            grep -qx "$a" <<<"$have" || missing="$missing $a"
+          done
+          if [ -n "$missing" ]; then
+            if [ "$EVENT" = schedule ]; then
+              echo "::warning title=Release $tag is incomplete::missing:$missing -- will retry on the next schedule"
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::release $tag is missing:$missing"; exit 1
+          fi
+
+          # Snapshot of the four assets, re-checked before anything is
+          # pushed: the upload steps use --clobber, so a re-run of the tag
+          # build can replace an image between our download and our commit.
+          jq -r --arg names "$ASSETS" '
+            ($names | split(" ")) as $want
+            | .assets[] | select(.name as $n | $want | index($n))
+            | "\(.name) \(.id) \(.size) \(.updated_at) \(.state)"' <<<"$release" \
+            | sort > "$RUNNER_TEMP/assets.before"
+          cat "$RUNNER_TEMP/assets.before"
+
+          version=${tag#v}
+          current=$(brew info --cask --json=v2 "$TAP/fastag-cli" | jq -r '.casks[0].version')
+          newest=$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -1)
+          if [ "$newest" != "$version" ]; then
+            echo "::error::tap is at $current, refusing to move it back to $version (a demoted or deleted release needs a human)"; exit 1
+          fi
+          # Equal is NOT a no-op: a re-run of a tag build re-uploads its assets
+          # (--clobber) and the digests must follow the bytes. Note that a
+          # digest-only change does not reach users who already installed
+          # this version -- `brew upgrade` compares versions, not digests --
+          # so bytes that users must receive need a new release.
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "proceed=true"
+          } >> "$GITHUB_OUTPUT"
+          echo "publishing $tag (tap currently at $current)"
+
+      - name: Rewrite version and sha256 of both casks
+        if: steps.release.outputs.proceed == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          # Homebrew's own bump tool: downloads the arm64 AND the x64 image of
+          # each cask, computes both digests and rewrites the stanzas in place.
+          # Audit and style run once for both casks in the next step.
+          for cask in fastag fastag-cli; do
+            brew bump-cask-pr --write-only --no-audit --no-style --version "$VERSION" "$TAP/$cask"
+            grep -q "version \"$VERSION\"" "Casks/$cask.rb" || {
+              echo "::error::Casks/$cask.rb does not carry version $VERSION after the bump"; exit 1; }
+          done
+          git --no-pager diff --stat
+
+      - name: Audit, style, and the declared macOS floors
+        if: steps.release.outputs.proceed == 'true'
+        run: |
+          # --except=min_os: the app's Info.plist says 11.0, but the binaries
+          # inside need 14 (arm64) / 15 (x64) and the casks say so. That
+          # deliberate mismatch is what the online min_os audit would flag;
+          # the floor check below is the stricter replacement, and it covers
+          # both architectures rather than the runner's.
+          brew audit --cask --strict --online --except=min_os "$TAP/fastag" "$TAP/fastag-cli"
+          brew style "$TAP"
+          brew fetch --cask --arch all "$TAP/fastag" "$TAP/fastag-cli"
+          .github/scripts/check-macos-floor.sh "$TAP" fastag fastag-cli
+
+      - name: Install the command-line tool and run it
+        if: steps.release.outputs.proceed == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          brew install --cask "$TAP/fastag-cli"
+          command -v FASTag
+          FASTag --help 2>&1 | tee "$RUNNER_TEMP/help.txt" | head -20
+          grep -F "Version: $VERSION" "$RUNNER_TEMP/help.txt"
+          # The same species smoke ci.yml runs at tag time, from an unrelated
+          # directory through the PATH command: proves the wrapper, the dylib
+          # closure, OPENMS_DATA_PATH and the taxonomy index all resolved.
+          mz="$(brew --caskroom)/fastag-cli/$VERSION/FASTag/share-OpenMS/examples/ID/Ecoli_MS2_small.mzML"
+          test -s "$mz"
+          cd "$RUNNER_TEMP"
+          FASTag -in "$mz" -out smoke.tsv -species -species_out smoke.species.tsv \
+            -tag_length 7 -extension 2 -fragment_tolerance 0.3 -fragment_tolerance_unit Da
+          [ "$(wc -l < smoke.species.tsv)" -ge 2 ] || { echo "::error::species smoke wrote an empty report"; exit 1; }
+          head -3 smoke.species.tsv
+
+      - name: Install the desktop app and check Gatekeeper accepts it
+        if: steps.release.outputs.proceed == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          brew install --cask "$TAP/fastag"
+          spctl -a -vv /Applications/FASTag.app 2>&1 | tee "$RUNNER_TEMP/spctl.txt"
+          grep -q "accepted" "$RUNNER_TEMP/spctl.txt"
+          [ "$(defaults read /Applications/FASTag.app/Contents/Info.plist CFBundleShortVersionString)" = "$VERSION" ]
+          # The app's own bundled command-line tool has to run too.
+          /Applications/FASTag.app/Contents/Resources/resources/fastag/bin/FASTag --help 2>&1 | grep -F "Version: $VERSION"
+
+      - name: Uninstall both
+        if: steps.release.outputs.proceed == 'true'
+        run: |
+          brew uninstall --cask "$TAP/fastag" "$TAP/fastag-cli"
+          if command -v FASTag; then echo "::error::FASTag still on PATH after uninstall"; exit 1; fi
+          test ! -e /Applications/FASTag.app
+
+      - name: Commit and push (only if something changed)
+        if: steps.release.outputs.proceed == 'true'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          git add Casks
+          if git diff --cached --quiet; then
+            echo "casks already describe $TAG; nothing to commit"
+            exit 0
+          fi
+          # The assets we hashed must still be the assets on the release.
+          gh api "repos/$UPSTREAM/releases/tags/$TAG" \
+            | jq -r --arg names "$ASSETS" '
+                ($names | split(" ")) as $want
+                | .assets[] | select(.name as $n | $want | index($n))
+                | "\(.name) \(.id) \(.size) \(.updated_at) \(.state)"' \
+            | sort > "$RUNNER_TEMP/assets.after"
+          if ! diff "$RUNNER_TEMP/assets.before" "$RUNNER_TEMP/assets.after"; then
+            echo "::error::the release's assets changed while this run was testing them; re-run"; exit 1
+          fi
+          # Everything above was tested on $base; publish only onto that.
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "$base" ]; then
+            echo "::error::main moved during this run (tested $base, now $(git rev-parse origin/main)); re-run"; exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fastag, fastag-cli: update to $VERSION" \
+                     -m "Source: https://github.com/$UPSTREAM/releases/tag/$TAG"
+          git push origin HEAD:main
+          git --no-pager log --oneline -1
