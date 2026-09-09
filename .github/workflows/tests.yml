@@ -57,7 +57,10 @@ jobs:
           version=$(brew info --cask --json=v2 "$TAP/fastag-cli" | jq -r '.casks[0].version')
           brew install --cask "$TAP/fastag-cli"
           command -v FASTag
-          FASTag --help 2>&1 | tee "$RUNNER_TEMP/help.txt" | head -20
+          # Not `| tee | head`: under pipefail, head closing the pipe early
+          # makes tee fail the whole pipeline.
+          FASTag --help > "$RUNNER_TEMP/help.txt" 2>&1
+          head -20 "$RUNNER_TEMP/help.txt"
           grep -F "Version: $version" "$RUNNER_TEMP/help.txt"
           mz="$(brew --caskroom)/fastag-cli/$version/FASTag/share-OpenMS/examples/ID/Ecoli_MS2_small.mzML"
           test -s "$mz"

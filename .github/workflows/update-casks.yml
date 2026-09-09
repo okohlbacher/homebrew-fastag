@@ -133,11 +133,7 @@ jobs:
           if [ "$newest" != "$version" ]; then
             echo "::error::tap is at $current, refusing to move it back to $version (a demoted or deleted release needs a human)"; exit 1
           fi
-          # Equal is NOT a no-op: a re-run of a tag build re-uploads its assets
-          # (--clobber) and the digests must follow the bytes. Note that a
-          # digest-only change does not reach users who already installed
-          # this version -- `brew upgrade` compares versions, not digests --
-          # so bytes that users must receive need a new release.
+          # Equal is verified, not rewritten (see the next step).
           {
             echo "tag=$tag"
             echo "version=$version"
@@ -153,7 +149,27 @@ jobs:
           # Homebrew's own bump tool: downloads the arm64 AND the x64 image of
           # each cask, computes both digests and rewrites the stanzas in place.
           # Audit and style run once for both casks in the next step.
+          #
+          # It refuses a no-op ("Unable to update cask"), so a cask already
+          # at this version is VERIFIED instead: `brew fetch --arch all`
+          # downloads both images and checks them against the recorded
+          # digests. A mismatch means the assets were replaced under the same
+          # tag (a re-run of the tag build uploads with --clobber). That is
+          # not repaired here on purpose: `brew upgrade` compares versions,
+          # not digests, so users who already installed would keep the old
+          # bytes anyway -- changed bytes need a new release, and this run
+          # stays red until one exists.
           for cask in fastag fastag-cli; do
+            current=$(brew info --cask --json=v2 "$TAP/$cask" | jq -r '.casks[0].version')
+            if [ "$current" = "$VERSION" ]; then
+              if brew fetch --cask --arch all "$TAP/$cask"; then
+                echo "$cask: already at $VERSION and both images match their digests"
+              else
+                echo "::error::$cask is at $VERSION but the release's images no longer match its digests: the assets were replaced under the same tag. Cut a new release."
+                exit 1
+              fi
+              continue
+            fi
             brew bump-cask-pr --write-only --no-audit --no-style --version "$VERSION" "$TAP/$cask"
             grep -q "version \"$VERSION\"" "Casks/$cask.rb" || {
               echo "::error::Casks/$cask.rb does not carry version $VERSION after the bump"; exit 1; }
@@ -180,7 +196,10 @@ jobs:
         run: |
           brew install --cask "$TAP/fastag-cli"
           command -v FASTag
-          FASTag --help 2>&1 | tee "$RUNNER_TEMP/help.txt" | head -20
+          # Not `| tee | head`: under pipefail, head closing the pipe early
+          # makes tee fail the whole pipeline.
+          FASTag --help > "$RUNNER_TEMP/help.txt" 2>&1
+          head -20 "$RUNNER_TEMP/help.txt"
           grep -F "Version: $VERSION" "$RUNNER_TEMP/help.txt"
           # The same species smoke ci.yml runs at tag time, from an unrelated
           # directory through the PATH command: proves the wrapper, the dylib

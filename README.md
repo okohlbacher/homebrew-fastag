@@ -54,14 +54,15 @@ gh workflow run update-casks.yml -R okohlbacher/homebrew-fastag -f tag=v1.4.3
 
 Each run refuses drafts, pre-releases and partial releases (all four macOS
 images must be attached), refuses to move a cask backwards, rewrites both
-casks with `brew bump-cask-pr --write-only`, runs `brew audit --cask --strict
---online` and `brew style`, checks the declared minimum macOS of both
-architectures against the Mach-Os inside the images
-(`.github/scripts/check-macos-floor.sh`), installs both casks on the runner
-(`FASTag --help` has to report the new version, the species smoke test has
-to produce a report, `spctl` has to accept the app), re-checks that the
-release's assets did not change meanwhile, and only then commits. A run that
-finds nothing to change commits nothing.
+casks with `brew bump-cask-pr --write-only` (or, when a cask is already at
+that version, verifies both of its images against the recorded digests),
+runs `brew audit --cask --strict --online` and `brew style`, checks the
+declared minimum macOS of both architectures against the Mach-Os inside the
+images (`.github/scripts/check-macos-floor.sh`), installs both casks on the
+runner (`FASTag --help` has to report the new version, the species smoke
+test has to produce a report, `spctl` has to accept the app), re-checks that
+the release's assets did not change meanwhile, and only then commits. A run
+that finds nothing to change commits nothing.
 
 `.github/workflows/tests.yml` runs the same checks on every push and pull
 request, for hand-made edits.
@@ -69,9 +70,10 @@ request, for hand-made edits.
 Two limits worth knowing:
 
 * A release whose assets are replaced under the same tag (a re-run of the
-  tag build) gets its digests refreshed here, but `brew upgrade` compares
-  versions, not digests -- users who already installed that version keep
-  the old bytes. Bytes that users must receive need a new release.
+  tag build) is not re-published: `brew upgrade` compares versions, not
+  digests, so users who already installed that version would keep the old
+  bytes anyway. The update run goes red with a clear message until a new
+  release exists.
 * GitHub disables a scheduled workflow after 60 days without a commit to the
   repository. FASTag's CI re-enables it before each dispatch when the token
   below is configured; without the token, re-enable it by hand under
