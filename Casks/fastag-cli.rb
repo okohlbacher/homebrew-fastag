@@ -1,9 +1,9 @@
 cask "fastag-cli" do
   arch arm: "arm64", intel: "x64"
 
-  version "1.4.2"
-  sha256 arm:   "384bdc59868f470ece7e05c0201423e8d19f507a997668beb7d0f0b3d19759ee",
-         intel: "7c81405742204a2ed0a4ec962fb34b55a53ddacbab92a60b5671862dcbb949e5"
+  version "1.4.3"
+  sha256 arm:   "49d875f42dcd1024d20952258b880e9ea1e02aa6d27849c739a5656b0eff0d7e",
+         intel: "9cabd21aa81ae4301011d1266cd08eaa3184e576a837dba0d6f5906837016c29"
 
   # FASTag.bin is built without a deployment target, so its floor is the SDK
   # of the runner that built it (LC_BUILD_VERSION minos): 14.0 on arm64,
