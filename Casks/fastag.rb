@@ -1,9 +1,9 @@
 cask "fastag" do
   arch arm: "arm64", intel: "x64"
 
-  version "1.6.0"
-  sha256 arm:   "cac0261bd66ad823a0a21d3f709b89cdfd5e345634b20a804594b3847bf5abea",
-         intel: "0e1ac07ca4f2b36880b6a8bfabf67e349f9636d642911c46535908e58737eda0"
+  version "1.6.1"
+  sha256 arm:   "1d30755849213ab492337afe1a8ab0e8c01c6c0d7689b669df97122631a0a174",
+         intel: "d8b68e5c952729ab85a59daab687bbac9e033a2deffc1ab0b34e305f3ee49216"
 
   # The app's Info.plist says 11.0, but the command-line tool it bundles and
   # runs is built without a deployment target, so its floor is the SDK of the
