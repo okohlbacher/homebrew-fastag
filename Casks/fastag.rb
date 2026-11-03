@@ -1,22 +1,8 @@
 cask "fastag" do
-  arch arm: "arm64", intel: "x64"
-
   version "1.6.1"
-  sha256 arm:   "1d30755849213ab492337afe1a8ab0e8c01c6c0d7689b669df97122631a0a174",
-         intel: "d8b68e5c952729ab85a59daab687bbac9e033a2deffc1ab0b34e305f3ee49216"
+  sha256 "1d30755849213ab492337afe1a8ab0e8c01c6c0d7689b669df97122631a0a174"
 
-  # The app's Info.plist says 11.0, but the command-line tool it bundles and
-  # runs is built without a deployment target, so its floor is the SDK of the
-  # runner that built it: macOS 14 on arm64, macOS 15 on x64. Below that the
-  # app launches and every run fails. These floors follow the binary.
-  on_arm do
-    depends_on macos: :sonoma
-  end
-  on_intel do
-    depends_on macos: :sequoia
-  end
-
-  url "https://github.com/okohlbacher/FASTag/releases/download/v#{version}/FASTag-gui-macos-#{arch}.dmg"
+  url "https://github.com/okohlbacher/FASTag/releases/download/v#{version}/FASTag-gui-macos-arm64.dmg"
   name "FASTag"
   desc "Sequence-tag search and species identification for tandem mass spectra"
   homepage "https://okohlbacher.github.io/FASTag/"
@@ -25,6 +11,12 @@ cask "fastag" do
     url :url
     strategy :github_latest
   end
+
+  # Apple silicon only from 1.8.0 on. The command-line tool the app bundles
+  # targets macOS 13.4, which Homebrew cannot express (:ventura is 13.0), so
+  # the cask declares 14.
+  depends_on arch: :arm64
+  depends_on macos: :sonoma
 
   app "FASTag.app"
 

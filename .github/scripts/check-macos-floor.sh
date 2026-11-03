@@ -1,12 +1,12 @@
 #!/bin/bash
 # Check that each cask's declared minimum macOS is at least what its payload
-# needs, for BOTH architectures, from the disk images in Homebrew's cache.
+# needs, from the disk images in Homebrew's cache.
 #
 #   check-macos-floor.sh <tap> <cask> [<cask> ...]
 #
 # FASTag's Mach-Os are built without a deployment target, so their floor is
 # whatever SDK the CI runner had (LC_BUILD_VERSION minos: 14.0 on arm64, 15.0
-# on x64 for v1.4.2), and it can move whenever GitHub retires a runner image.
+# on x64 for v1.4.2; 13.4 from 1.8.0 on), and it can move whenever GitHub retires a runner image.
 # The app's Info.plist still says 11.0 -- so the online `brew audit` min_os
 # check is skipped for the app and THIS check is what keeps the casks honest:
 # it mounts every image, reads the highest minos over every Mach-O inside,
@@ -24,7 +24,7 @@ cask_lines=$(brew ruby -e '
   require "cask/download"
   tap = ARGV.shift
   ARGV.each do |token|
-    [:arm, :intel].each do |arch|
+    [:arm].each do |arch|  # arm64 only from 1.8.0 on
       Homebrew::SimulateSystem.with(os: :macos, arch: arch) do
         cask = Cask::CaskLoader.load("#{tap}/#{token}")
         floor = cask.depends_on.macos&.minimum_version&.to_s || "none"

@@ -44,12 +44,11 @@ jobs:
       - name: Audit, style, and the declared macOS floors
         run: |
           # --except=min_os: see update-casks.yml -- the app bundle claims
-          # macOS 11 but the binaries inside need 14/15, the casks follow the
-          # binaries, and check-macos-floor.sh verifies that for both
-          # architectures.
+          # macOS 11 but the binaries inside need 13.4, the casks say 14,
+          # and check-macos-floor.sh verifies that.
           brew audit --cask --strict --online --except=min_os "$TAP/fastag" "$TAP/fastag-cli"
           brew style "$TAP"
-          brew fetch --cask --arch all "$TAP/fastag" "$TAP/fastag-cli"
+          brew fetch --cask --arch arm "$TAP/fastag" "$TAP/fastag-cli"
           .github/scripts/check-macos-floor.sh "$TAP" fastag fastag-cli
 
       - name: Install the command-line tool and run it

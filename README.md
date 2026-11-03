@@ -2,7 +2,8 @@
 
 Homebrew tap for [FASTag](https://github.com/okohlbacher/FASTag), a
 sequence-tag search and species identification tool for tandem mass
-spectra. macOS only (Homebrew casks); Apple silicon and Intel.
+spectra. macOS only (Homebrew casks); Apple silicon only from 1.8.0 on (1.6.1 was
+the last release for Intel Macs).
 
 ## Install
 
@@ -21,8 +22,8 @@ brew install --cask fastag fastag-cli
 
 | cask | installs | from |
 |---|---|---|
-| `fastag` | `FASTag.app` (Developer ID signed, notarized, stapled) | `FASTag-gui-macos-{arm64,x64}.dmg` |
-| `fastag-cli` | the `FASTag` command; the whole `FASTag/` folder stays in the Caskroom and a wrapper in `$(brew --prefix)/bin` runs it in place | `FASTag-macos-{arm64,x64}.dmg` |
+| `fastag` | `FASTag.app` (Developer ID signed, notarized, stapled) | `FASTag-gui-macos-arm64.dmg` |
+| `fastag-cli` | the `FASTag` command; the whole `FASTag/` folder stays in the Caskroom and a wrapper in `$(brew --prefix)/bin` runs it in place | `FASTag-macos-arm64.dmg` |
 
 Both casks download the exact disk images published on each
 [FASTag release](https://github.com/okohlbacher/FASTag/releases) and verify
@@ -31,9 +32,8 @@ line tool, so install `fastag-cli` only if you want `FASTag` in a shell.
 Each cask is about 500 MB to download and about 1.4 GB on disk (most of it
 the taxonomy index).
 
-Minimum macOS: 14 (Sonoma) on Apple silicon, 15 (Sequoia) on Intel -- the
-floor of the shipped binaries, which is higher than the 11.0 the app bundle
-declares.
+Minimum macOS: 14 (Sonoma). The shipped binaries target 13.4, which a cask
+cannot express; the app bundle itself declares 11.0.
 
 ```sh
 brew upgrade --cask fastag fastag-cli     # newer release
@@ -52,12 +52,12 @@ CI with a specific tag:
 gh workflow run update-casks.yml -R okohlbacher/homebrew-fastag -f tag=v1.4.3
 ```
 
-Each run refuses drafts, pre-releases and partial releases (all four macOS
+Each run refuses drafts, pre-releases and partial releases (both macOS
 images must be attached), refuses to move a cask backwards, rewrites both
 casks with `brew bump-cask-pr --write-only` (or, when a cask is already at
-that version, verifies both of its images against the recorded digests),
+that version, verifies its image against the recorded digests),
 runs `brew audit --cask --strict --online` and `brew style`, checks the
-declared minimum macOS of both architectures against the Mach-Os inside the
+declared minimum macOS against the Mach-Os inside the
 images (`.github/scripts/check-macos-floor.sh`), installs both casks on the
 runner (`FASTag --help` has to report the new version, the species smoke
 test has to produce a report, `spctl` has to accept the app), re-checks that
@@ -104,7 +104,7 @@ brew bump-cask-pr --write-only --version 1.4.3 okohlbacher/fastag/fastag
 brew bump-cask-pr --write-only --version 1.4.3 okohlbacher/fastag/fastag-cli
 brew audit --cask --strict --online --except=min_os okohlbacher/fastag/fastag okohlbacher/fastag/fastag-cli
 brew style okohlbacher/fastag
-brew fetch --cask --arch all okohlbacher/fastag/fastag okohlbacher/fastag/fastag-cli
+brew fetch --cask --arch arm okohlbacher/fastag/fastag okohlbacher/fastag/fastag-cli
 .github/scripts/check-macos-floor.sh okohlbacher/fastag fastag fastag-cli
 ```
 
