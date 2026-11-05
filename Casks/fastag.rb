@@ -1,6 +1,6 @@
 cask "fastag" do
-  version "1.10.0"
-  sha256 "06fdcc1057e8db443a6c03a991e9cd84282f84b2b7cf50e565143b63bd231a75"
+  version "1.11.0"
+  sha256 "e33702b63b2b98dbd702a7bfd1fdf2a04e4a0998f1c5b112f514ece4e7d4e6d6"
 
   url "https://github.com/okohlbacher/FASTag/releases/download/v#{version}/FASTag-gui-macos-arm64.dmg"
   name "FASTag"
