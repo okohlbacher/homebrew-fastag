@@ -1,6 +1,6 @@
 cask "fastag-cli" do
-  version "1.13.3"
-  sha256 "c00209b80434fb37dd323ae37310ecd7293a30c8573c1c325fc298bf0e50573e"
+  version "1.13.4"
+  sha256 "5399cfd2739c6095e58e38ad035474e723bb7cf20be1436d1456c1080a1c49d3"
 
   url "https://github.com/okohlbacher/FASTag/releases/download/v#{version}/FASTag-macos-arm64.dmg"
   name "FASTag command-line tool"
