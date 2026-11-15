@@ -52,6 +52,11 @@ env:
   # they did not (FASTag-<variant>). The resolve step picks whichever the
   # release has and exports the names as ASSETS.
   VARIANTS: gui-macos-arm64.dmg macos-arm64.dmg
+  # Intel images again after 1.14.0 (none from 1.8.0 to 1.14.x). Optional:
+  # a release without them keeps the casks Apple-silicon only; the first
+  # release WITH them turns both casks into arch-dependent ones
+  # (.github/scripts/arch-cask.sh), and from then on they are required.
+  X64_VARIANTS: gui-macos-x64.dmg macos-x64.dmg
   GH_TOKEN: ${{ github.token }}
   HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
   HOMEBREW_NO_AUTO_UPDATE: 1
@@ -124,6 +129,15 @@ jobs:
               missing="$missing FASTag-$v-$variant"
             fi
           done
+          # Intel images: required once a cask serves Intel, optional before.
+          intel_casks=$(grep -l '^  arch arm:' Casks/*.rb || true)
+          for variant in $X64_VARIANTS; do
+            if grep -qx "FASTag-$v-$variant" <<<"$have"; then
+              ASSETS="$ASSETS FASTag-$v-$variant"
+            elif [ -n "$intel_casks" ]; then
+              missing="$missing FASTag-$v-$variant"
+            fi
+          done
           ASSETS=${ASSETS# }
           echo "ASSETS=$ASSETS" >> "$GITHUB_ENV"
           echo "images: $ASSETS"
@@ -165,8 +179,9 @@ jobs:
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          # Homebrew's own bump tool: downloads the arm64 image of
-          # each cask, computes its digest and rewrites the stanzas in place.
+          # Homebrew's own bump tool: downloads the image of each cask (one
+          # per architecture once a cask serves Intel), computes the digests
+          # and rewrites the stanzas in place.
           # Audit and style run once for both casks in the next step.
           #
           # It refuses a no-op ("Unable to update cask"), so a cask already
@@ -181,7 +196,7 @@ jobs:
           for cask in fastag fastag-cli; do
             current=$(brew info --cask --json=v2 "$TAP/$cask" | jq -r '.casks[0].version')
             if [ "$current" = "$VERSION" ]; then
-              if brew fetch --cask --arch arm "$TAP/$cask"; then
+              if .github/scripts/fetch-all-arches.sh "$TAP/$cask"; then
                 echo "$cask: already at $VERSION and its image matches its digest"
               else
                 echo "::error::$cask is at $VERSION but the release's images no longer match its digests: the assets were replaced under the same tag. Cut a new release."
@@ -200,7 +215,16 @@ jobs:
               grep -qF "/FASTag-#{version}-$variant\"" "Casks/$cask.rb" || {
                 echo "::error::Casks/$cask.rb has no url .../FASTag-#{version}-$variant after the rewrite"; exit 1; }
             fi
+            # Intel images on the release: serve them (arch-dependent url
+            # and sha256). Once per cask; the bump below fills both digests.
+            case "$cask" in fastag) xvariant=gui-macos-x64.dmg ;; *) xvariant=macos-x64.dmg ;; esac
+            if tr ' ' '\n' <<<"$ASSETS" | grep -qx "FASTag-$VERSION-$xvariant"; then
+              .github/scripts/arch-cask.sh "Casks/$cask.rb"
+            fi
             brew bump-cask-pr --write-only --no-audit --no-style --version "$VERSION" "$TAP/$cask"
+            if grep -q '^  arch arm:' "Casks/$cask.rb" && grep -q '"0\{64\}"' "Casks/$cask.rb"; then
+              echo "::error::Casks/$cask.rb still carries the placeholder intel sha256 after the bump"; exit 1
+            fi
             grep -q "version \"$VERSION\"" "Casks/$cask.rb" || {
               echo "::error::Casks/$cask.rb does not carry version $VERSION after the bump"; exit 1; }
           done
@@ -215,7 +239,7 @@ jobs:
           # the floor check below is the stricter replacement.
           brew audit --cask --strict --online --except=min_os "$TAP/fastag" "$TAP/fastag-cli"
           brew style "$TAP"
-          brew fetch --cask --arch arm "$TAP/fastag" "$TAP/fastag-cli"
+          .github/scripts/fetch-all-arches.sh "$TAP/fastag" "$TAP/fastag-cli"
           .github/scripts/check-macos-floor.sh "$TAP" fastag fastag-cli
 
       - name: Install the command-line tool and run it

@@ -2,8 +2,9 @@
 
 Homebrew tap for [FASTag](https://github.com/okohlbacher/FASTag), a
 sequence-tag search and species identification tool for tandem mass
-spectra. macOS only (Homebrew casks); Apple silicon only from 1.8.0 on (1.6.1 was
-the last release for Intel Macs).
+spectra. macOS only (Homebrew casks). Apple silicon, and Intel again from the
+first release after 1.14.0 that ships Intel disk images (1.8.0 to 1.14.x were
+Apple silicon only; 1.6.1 is the last earlier Intel release).
 
 ## Install
 
@@ -22,8 +23,14 @@ brew install --cask fastag fastag-cli
 
 | cask | installs | from |
 |---|---|---|
-| `fastag` | `FASTag.app` (Developer ID signed, notarized, stapled) | `FASTag-<version>-gui-macos-arm64.dmg` (`FASTag-gui-macos-arm64.dmg` up to 1.14.0) |
-| `fastag-cli` | the `FASTag` command; the whole `FASTag/` folder stays in the Caskroom and a wrapper in `$(brew --prefix)/bin` runs it in place | `FASTag-<version>-macos-arm64.dmg` (`FASTag-macos-arm64.dmg` up to 1.14.0) |
+| `fastag` | `FASTag.app` (Developer ID signed, notarized, stapled) | `FASTag-<version>-gui-macos-<arch>.dmg`, `<arch>` = `arm64` or `x64` (`FASTag-gui-macos-arm64.dmg` up to 1.14.0) |
+| `fastag-cli` | the `FASTag` command; the whole `FASTag/` folder stays in the Caskroom and a wrapper in `$(brew --prefix)/bin` runs it in place | `FASTag-<version>-macos-<arch>.dmg` (`FASTag-macos-arm64.dmg` up to 1.14.0) |
+
+Homebrew picks the image for the Mac's architecture. The casks become
+arch-dependent (`arch arm: "arm64", intel: "x64"`, one sha256 per
+architecture) at the first release that carries the Intel images:
+`update-casks.yml` rewrites them once with `.github/scripts/arch-cask.sh`
+before the bump.
 
 Both casks download the exact disk images published on each
 [FASTag release](https://github.com/okohlbacher/FASTag/releases) and verify
@@ -105,6 +112,7 @@ brew bump-cask-pr --write-only --version 1.4.3 okohlbacher/fastag/fastag-cli
 brew audit --cask --strict --online --except=min_os okohlbacher/fastag/fastag okohlbacher/fastag/fastag-cli
 brew style okohlbacher/fastag
 brew fetch --cask --arch arm okohlbacher/fastag/fastag okohlbacher/fastag/fastag-cli
+brew fetch --cask --arch intel okohlbacher/fastag/fastag okohlbacher/fastag/fastag-cli   # once the casks serve Intel
 .github/scripts/check-macos-floor.sh okohlbacher/fastag fastag fastag-cli
 ```
 

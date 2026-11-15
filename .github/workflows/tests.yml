@@ -26,13 +26,33 @@ env:
 
 jobs:
   test:
-    runs-on: macos-15
+    name: test (${{ matrix.runner }})
+    # Apple silicon always; Intel once the casks serve it (an `arch` stanza,
+    # from the first FASTag release after 1.14.0 with macos-x64 images).
+    # macos-26-intel is GitHub's newest x64 image; drop the row before
+    # GitHub retires it, or the job waits for a runner that never comes.
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-26-intel]
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
 
+      - name: Does this runner's architecture have casks to test?
+        id: serve
+        run: |
+          if [ "$(uname -m)" = arm64 ] || grep -q '^  arch arm:' Casks/fastag.rb Casks/fastag-cli.rb; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::the casks are Apple silicon only; nothing to install on $(uname -m)"
+          fi
+
       - name: Register the checkout as the tap
+        if: steps.serve.outputs.run == 'true'
         run: |
           taps="$(brew --repository)/Library/Taps/okohlbacher"
           mkdir -p "$taps"
@@ -42,16 +62,18 @@ jobs:
           brew --version
 
       - name: Audit, style, and the declared macOS floors
+        if: steps.serve.outputs.run == 'true'
         run: |
           # --except=min_os: see update-casks.yml -- the app bundle claims
           # macOS 11 but the binaries inside need 13.4, the casks say 14,
           # and check-macos-floor.sh verifies that.
           brew audit --cask --strict --online --except=min_os "$TAP/fastag" "$TAP/fastag-cli"
           brew style "$TAP"
-          brew fetch --cask --arch arm "$TAP/fastag" "$TAP/fastag-cli"
+          .github/scripts/fetch-all-arches.sh "$TAP/fastag" "$TAP/fastag-cli"
           .github/scripts/check-macos-floor.sh "$TAP" fastag fastag-cli
 
       - name: Install the command-line tool and run it
+        if: steps.serve.outputs.run == 'true'
         run: |
           version=$(brew info --cask --json=v2 "$TAP/fastag-cli" | jq -r '.casks[0].version')
           brew install --cask "$TAP/fastag-cli"
@@ -70,6 +92,7 @@ jobs:
           head -3 smoke.species.tsv
 
       - name: Install the desktop app and check Gatekeeper accepts it
+        if: steps.serve.outputs.run == 'true'
         run: |
           version=$(brew info --cask --json=v2 "$TAP/fastag" | jq -r '.casks[0].version')
           brew install --cask "$TAP/fastag"
@@ -79,6 +102,7 @@ jobs:
           /Applications/FASTag.app/Contents/Resources/resources/fastag/bin/FASTag --help 2>&1 | grep -F "Version: $version"
 
       - name: Uninstall both
+        if: steps.serve.outputs.run == 'true'
         run: |
           brew uninstall --cask "$TAP/fastag" "$TAP/fastag-cli"
           if command -v FASTag; then echo "::error::FASTag still on PATH after uninstall"; exit 1; fi
