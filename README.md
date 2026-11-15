@@ -22,8 +22,8 @@ brew install --cask fastag fastag-cli
 
 | cask | installs | from |
 |---|---|---|
-| `fastag` | `FASTag.app` (Developer ID signed, notarized, stapled) | `FASTag-gui-macos-arm64.dmg` |
-| `fastag-cli` | the `FASTag` command; the whole `FASTag/` folder stays in the Caskroom and a wrapper in `$(brew --prefix)/bin` runs it in place | `FASTag-macos-arm64.dmg` |
+| `fastag` | `FASTag.app` (Developer ID signed, notarized, stapled) | `FASTag-<version>-gui-macos-arm64.dmg` (`FASTag-gui-macos-arm64.dmg` up to 1.14.0) |
+| `fastag-cli` | the `FASTag` command; the whole `FASTag/` folder stays in the Caskroom and a wrapper in `$(brew --prefix)/bin` runs it in place | `FASTag-<version>-macos-arm64.dmg` (`FASTag-macos-arm64.dmg` up to 1.14.0) |
 
 Both casks download the exact disk images published on each
 [FASTag release](https://github.com/okohlbacher/FASTag/releases) and verify
