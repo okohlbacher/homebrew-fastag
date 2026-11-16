@@ -24,7 +24,11 @@ cask_lines=$(brew ruby -e '
   require "cask/download"
   tap = ARGV.shift
   ARGV.each do |token|
-    [:arm].each do |arch|  # arm64 only from 1.8.0 on
+    # arm64 always; Intel too once the cask serves it (an `arch` stanza,
+    # Intel images again after 1.14.0 -- see arch-cask.sh).
+    src = File.read(Cask::CaskLoader.load("#{tap}/#{token}").sourcefile_path)
+    arches = src.match?(/^  arch arm:/) ? [:arm, :intel] : [:arm]
+    arches.each do |arch|
       Homebrew::SimulateSystem.with(os: :macos, arch: arch) do
         cask = Cask::CaskLoader.load("#{tap}/#{token}")
         floor = cask.depends_on.macos&.minimum_version&.to_s || "none"
