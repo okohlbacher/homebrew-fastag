@@ -1,8 +1,11 @@
 cask "fastag" do
-  version "1.14.0"
-  sha256 "601763029c4be09db07e4c83f557724a3b32991dbc10702bb50b1d405c24f67d"
+  arch arm: "arm64", intel: "x64"
 
-  url "https://github.com/okohlbacher/FASTag/releases/download/v#{version}/FASTag-gui-macos-arm64.dmg"
+  version "1.15.0"
+  sha256 arm:   "8a4df864dc05b2faf01bb679f8c69596cd298b01f6d1bef0720ecc0a0c74c48b",
+         intel: "8231d45eb3546fbdad7f642119b353579e1f6bfd466b4e6a8275b8c6574eebca"
+
+  url "https://github.com/okohlbacher/FASTag/releases/download/v#{version}/FASTag-#{version}-gui-macos-#{arch}.dmg"
   name "FASTag"
   desc "Sequence-tag search and species identification for tandem mass spectra"
   homepage "https://okohlbacher.github.io/FASTag/"
@@ -12,10 +15,9 @@ cask "fastag" do
     strategy :github_latest
   end
 
-  # Apple silicon only from 1.8.0 on. The command-line tool the app bundles
+  # Apple silicon and Intel (Intel again after 1.14.0). The command-line tool the app bundles
   # targets macOS 13.4, which Homebrew cannot express (:ventura is 13.0), so
   # the cask declares 14.
-  depends_on arch: :arm64
   depends_on macos: :sonoma
 
   app "FASTag.app"
