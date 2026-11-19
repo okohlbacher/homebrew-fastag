@@ -60,7 +60,9 @@ norm() { case $1 in *.*) echo "$1" ;; *) echo "$1.0" ;; esac; }
 rc=0
 while read -r token arch floor dmg; do
   [ -f "$dmg" ] || { echo "::error::$token ($arch): image not in the Homebrew cache: $dmg"; rc=1; continue; }
-  mnt=$(hdiutil attach -readonly -nobrowse -noautoopen "$dmg" | grep -o '/Volumes/.*' | head -1)
+  # Since 1.15.2 the images carry a licence agreement (the Thermo RawFileReader
+  # notice); hdiutil cancels the attach unless it is accepted on stdin.
+  mnt=$(env PAGER=cat hdiutil attach -readonly -nobrowse -noautoopen "$dmg" < <(yes) | grep -o '/Volumes/.*' | head -1)
   need=$(norm "$(payload_floor "$mnt")")
   hdiutil detach "$mnt" -quiet
   [ "$floor" = none ] || floor=$(norm "$floor")
