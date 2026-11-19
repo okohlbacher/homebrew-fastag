@@ -31,4 +31,19 @@ cask "fastag" do
     "~/Library/Saved Application State/de.openms.fastag.savedState",
     "~/Library/WebKit/de.openms.fastag",
   ]
+
+  # From 1.15.2 the images carry Thermo's RawFileReader (Thermo .raw input).
+  # Its licence (section 3.3) asks that end users agree not to redistribute
+  # it; Homebrew mounts the image unattended past its licence prompt, so the
+  # terms are stated here.
+  caveats <<~EOS
+    FASTag reads Thermo .raw files with Thermo Fisher Scientific's
+    RawFileReader, which is not under FASTag's MIT licence but under
+    Thermo's own licence (LICENSES/ThermoRawFileReader-License.txt in
+    #{appdir}/FASTag.app/Contents/Resources/resources/fastag). By installing FASTag you accept it; in particular you
+    may not redistribute the RawFileReader assemblies
+    (ThermoFisher.CommonCore.*.dll) to others, nor exploit them commercially
+    without Thermo's written consent.
+    RawFileReader reading tool. Copyright © 2016 by Thermo Fisher Scientific, Inc. All rights reserved.
+  EOS
 end
