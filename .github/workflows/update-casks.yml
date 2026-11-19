@@ -212,7 +212,10 @@ jobs:
             case "$cask" in fastag) variant=gui-macos-arm64.dmg ;; *) variant=macos-arm64.dmg ;; esac
             if tr ' ' '\n' <<<"$ASSETS" | grep -qx "FASTag-$VERSION-$variant"; then
               sed -i '' "s|/FASTag-$variant\"|/FASTag-#{version}-$variant\"|" "Casks/$cask.rb"
-              grep -qF "/FASTag-#{version}-$variant\"" "Casks/$cask.rb" || {
+              # An arch-dependent cask (1.15.0 on) names the image by #{arch}.
+              avariant=$(sed 's/arm64/#{arch}/' <<<"$variant")
+              grep -qF "/FASTag-#{version}-$variant\"" "Casks/$cask.rb" \
+                || grep -qF "/FASTag-#{version}-$avariant\"" "Casks/$cask.rb" || {
                 echo "::error::Casks/$cask.rb has no url .../FASTag-#{version}-$variant after the rewrite"; exit 1; }
             fi
             # Intel images on the release: serve them (arch-dependent url
