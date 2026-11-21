@@ -39,8 +39,11 @@ line tool, so install `fastag-cli` only if you want `FASTag` in a shell.
 Each cask is about 500 MB to download and about 1.4 GB on disk (most of it
 the taxonomy index).
 
-Minimum macOS: 14 (Sonoma). The shipped binaries target 13.4, which a cask
-cannot express; the app bundle itself declares 11.0.
+Minimum macOS: 14 (Sonoma). The shipped binaries and the app bundle
+(`LSMinimumSystemVersion`) target 13.4, which a cask cannot express
+(`:ventura` is 13.0). On macOS 13.4 to 13.x install the disk images from the
+[FASTag release page](https://github.com/okohlbacher/FASTag/releases/latest)
+instead.
 
 ```sh
 brew upgrade --cask fastag fastag-cli     # newer release
@@ -117,8 +120,8 @@ brew fetch --cask --arch intel okohlbacher/fastag/fastag okohlbacher/fastag/fast
 ```
 
 (`--except=min_os`: the online audit compares the cask's minimum macOS with
-the app bundle's 11.0; the casks deliberately declare the binaries' higher
-floor, and the floor script is the stricter check.)
+the app bundle's 13.4; the casks deliberately declare 14, the next floor a
+cask can express, and the floor script is the stricter check.)
 
 ## License
 
