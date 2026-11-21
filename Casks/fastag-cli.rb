@@ -1,9 +1,9 @@
 cask "fastag-cli" do
   arch arm: "arm64", intel: "x64"
 
-  version "1.15.6"
-  sha256 arm:   "ca475d71fd7373e0f3827d66cbc215b8951e294fe23e65ec28f83e39a62f7e9e",
-         intel: "465bf28dcc7043392439e6c79e787142c3b7b87d60db6c5449c8c4d9fc016a9c"
+  version "1.15.7"
+  sha256 arm:   "1e597b11b64a26891219f5074896e1fc98d4752e14357f34a1c00a70cb093b0b",
+         intel: "9bd81fcce292b231944ae5db3c0d237911a5b194b639f532674c00376b5a6625"
 
   url "https://github.com/okohlbacher/FASTag/releases/download/v#{version}/FASTag-#{version}-macos-#{arch}.dmg"
   name "FASTag command-line tool"

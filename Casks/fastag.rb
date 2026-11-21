@@ -1,9 +1,9 @@
 cask "fastag" do
   arch arm: "arm64", intel: "x64"
 
-  version "1.15.6"
-  sha256 arm:   "1791f6661529e73588bda8c9526cc8c60dd4f65199305af25fe19405574e41db",
-         intel: "e7ca47c576c504bdc6f2865a5e794c43f96f8b03f207d4f993b8a3470cc4c48e"
+  version "1.15.7"
+  sha256 arm:   "b9832b8a26ebbd05dc0e5003d968cc5540405697e303f53797c519952b29773f",
+         intel: "7a021fe8810743e0601d8c25559f37c914edb951addbe16d2957e9cca857b3ee"
 
   url "https://github.com/okohlbacher/FASTag/releases/download/v#{version}/FASTag-#{version}-gui-macos-#{arch}.dmg"
   name "FASTag"
