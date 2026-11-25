@@ -279,6 +279,9 @@ jobs:
           [ "$(defaults read /Applications/FASTag.app/Contents/Info.plist CFBundleShortVersionString)" = "$VERSION" ]
           # The app's own bundled command-line tool has to run too.
           /Applications/FASTag.app/Contents/Resources/resources/fastag/bin/FASTag --help 2>&1 | grep -F "Version: $VERSION"
+          # And the species detection index it ships (-species in the app).
+          test -s /Applications/FASTag.app/Contents/Resources/resources/fastag/share/FASTag/taxonomy/tax_k7.taxdb \
+            || { echo "::error::the installed app has no share/FASTag/taxonomy/tax_k7.taxdb"; exit 1; }
 
       - name: Uninstall both
         if: steps.release.outputs.proceed == 'true'
