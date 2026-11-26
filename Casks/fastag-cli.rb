@@ -1,11 +1,8 @@
 cask "fastag-cli" do
-  arch arm: "arm64", intel: "x64"
-
   version "1.16.1"
-  sha256 arm:   "1a4865bec6ee312c8520911839e32ac24462fdf18c46c32db9a693c4783cf99d",
-         intel: "0176e78cf8bfc70b521cf1de89de8605cf544eb12187089baace520c76d7eb49"
+  sha256 "1a4865bec6ee312c8520911839e32ac24462fdf18c46c32db9a693c4783cf99d"
 
-  url "https://github.com/okohlbacher/FASTag/releases/download/v#{version}/FASTag-#{version}-macos-#{arch}.dmg"
+  url "https://github.com/okohlbacher/FASTag/releases/download/v#{version}/FASTag-#{version}-macos-arm64.dmg"
   name "FASTag command-line tool"
   desc "Command-line sequence-tag search and species identification for tandem MS"
   homepage "https://okohlbacher.github.io/FASTag/"
@@ -15,8 +12,9 @@ cask "fastag-cli" do
     strategy :github_latest
   end
 
-  # Apple silicon and Intel (Intel again after 1.14.0). FASTag.bin targets macOS 13.4, which
+  # Apple silicon only: Intel builds ended with 1.16.1. FASTag.bin targets macOS 13.4, which
   # Homebrew cannot express (:ventura is 13.0), so the cask declares 14.
+  depends_on arch: :arm64
   depends_on macos: :sonoma
 
   # The image holds one folder, FASTag/: a /bin/sh wrapper (FASTag), the

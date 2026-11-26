@@ -56,7 +56,8 @@ env:
   # a release without them keeps the casks Apple-silicon only; the first
   # release WITH them turns both casks into arch-dependent ones
   # (.github/scripts/arch-cask.sh), and from then on they are required.
-  X64_VARIANTS: gui-macos-x64.dmg macos-x64.dmg
+  # FASTag dropped its Intel images after 1.16.1; the casks are Apple silicon only.
+  X64_VARIANTS: ""
   GH_TOKEN: ${{ github.token }}
   HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
   HOMEBREW_NO_AUTO_UPDATE: 1

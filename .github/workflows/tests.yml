@@ -27,14 +27,11 @@ env:
 jobs:
   test:
     name: test (${{ matrix.runner }})
-    # Apple silicon always; Intel once the casks serve it (an `arch` stanza,
-    # from the first FASTag release after 1.14.0 with macos-x64 images).
-    # macos-26-intel is GitHub's newest x64 image; drop the row before
-    # GitHub retires it, or the job waits for a runner that never comes.
+    # Apple silicon only: FASTag dropped its Intel images after 1.16.1.
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-26-intel]
+        runner: [macos-15]
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
